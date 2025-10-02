@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plünnecke Graph Builder</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#121830; --ink:#e8ecff; --muted:#9aa4c7; --accent:#6cf; --accent2:#ffb86c; --ok:#4ade80; --warn:#f59e0b; --bad:#ef4444;
+      --chip:#1b2242; --chip2:#1f254a; --ring:#0f142a; --card:#141b38; --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 800px at 20% -20%,#1b2550 0%, transparent 60%),var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,"Helvetica Neue",Arial}
+    a{color:var(--accent)}
+    header{padding:18px 20px 8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+    .title{font-weight:800;letter-spacing:.3px;font-size:20px}
+    .sub{color:var(--muted);font-size:13px}
+    .wrap{display:grid;grid-template-columns:380px 1fr;gap:18px;padding:0 20px 20px}
+    @media (max-width:1000px){.wrap{grid-template-columns:1fr}}
+    .panel{background:linear-gradient(180deg,var(--panel),#0e1530);border:1px solid #2a3568;border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+    label{font-size:13px;color:var(--muted)}
+    input[type=number], select{width:100%;background:var(--card);border:1px solid #2a3568;color:var(--ink);border-radius:10px;padding:9px 10px}
+    .btn{background:var(--chip);border:1px solid #2a3568;color:var(--ink);padding:9px 12px;border-radius:12px;cursor:pointer}
+    .btn:hover{filter:brightness(1.1)}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .A{background:#5cc7ff}
+    .S{background:#6ee7b7}
+    .canvas-wrap{background:linear-gradient(180deg,#0e1530,#0b1126);border:1px solid #2a3568;border-radius:16px;padding:12px;display:grid;grid-template-columns:1fr;gap:12px;min-height:520px;box-shadow:var(--shadow)}
+    svg{max-width:100%;height:auto}
+    .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+    .card{background:var(--card);border:1px solid #2a3568;border-radius:14px;padding:12px}
+    .big{font-size:26px;font-weight:800}
+    .kpi{display:flex;justify-content:space-between;align-items:baseline}
+    .hint{font-size:13px;color:var(--muted)}
+    footer{max-width:1100px;margin:14px auto 40px;background:linear-gradient(180deg,var(--panel),#0e1530);border:1px solid #2a3568;border-radius:16px;padding:16px 20px;box-shadow:var(--shadow)}
+    h2{margin:8px 0 6px}
+    .kbd{display:inline-block;padding:2px 8px;border:1px solid #2a3568;border-radius:999px;background:var(--chip);font-size:12px}
+    .notice{margin-top:6px;color:var(--muted);font-size:13px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:800px){.grid2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">Plünnecke Graph Builder</div>
+    <div class="sub">Experiment with growth ratios |kA − ℓA| / |A| in ℤ/pℤ. Fix one of k, ℓ and visualize the function of the other.</div>
+  </header>
+
+  <div class="wrap">
+    <aside class="panel">
+      <div class="controls">
+        <div>
+          <label for="p">Prime p</label>
+          <input id="p" type="number" min="5" step="1" value="29" />
+        </div>
+        <div class="row">
+          <button class="btn" id="applyP">Apply</button>
+          <button class="btn" id="randomize">Randomize A</button>
+          <button class="btn" id="reset">Reset</button>
+        </div>
+        <div style="grid-column:1/-1" class="row">
+          <button class="btn" id="makeAInterval">Make A an interval</button>
+        </div>
+        <div style="grid-column:1/-1" class="row hint">
+          Tip: Small growth often appears when A is an arithmetic progression (interval) mod p.
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="card">
+          <div class="kpi"><div>|A|</div><div class="big" id="sizeA">0</div></div>
+          <div class="kpi"><div>Current ratio</div><div class="big" id="ratioNow">—</div></div>
+        </div>
+        <div class="card">
+          <div class="kpi"><div>Fixed</div><div id="fixedLabel" class="big">k=2</div></div>
+          <div class="kpi"><div>Free range</div><div class="big" id="rangeLabel">ℓ = 0…8</div></div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="grid2">
+            <div>
+              <label for="mode">Sweep mode</label>
+              <select id="mode">
+                <option value="sweepL">Fix k, sweep ℓ</option>
+                <option value="sweepK">Fix ℓ, sweep k</option>
+              </select>
+            </div>
+            <div>
+              <label for="fixed">Fixed value (nonnegative integer)</label>
+              <input id="fixed" type="number" min="0" step="1" value="2" />
+            </div>
+            <div>
+              <label for="maxFree">Max free value (inclusive)</label>
+              <input id="maxFree" type="number" min="0" step="1" value="8" />
+            </div>
+            <div class="row">
+              <button class="btn" id="replot">Plot</button>
+              <button class="btn" id="pickPoint">Highlight value at t = <span id="tval">0</span></button>
+              <input id="tSlider" type="range" min="0" max="8" step="1" value="0" style="flex:1"/>
+            </div>
+          </div>
+          <div class="notice">0A is taken to be {0}. For k,ℓ ≥ 1 we iteratively form k-fold sums and ℓ-fold sums, then the difference set kA − ℓA = {x − y}. Ratio is |kA − ℓA| / |A|.</div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="row"><span class="dot A"></span><span>Set A (inner ring)</span></div>
+        <div class="row"><span class="dot S"></span><span>Points in kA − ℓA are visualized numerically in the plot.</span></div>
+      </div>
+    </aside>
+
+    <main class="canvas-wrap">
+      <svg id="ring" viewBox="0 0 700 420" aria-label="Z mod p playground"></svg>
+      <svg id="chart" viewBox="0 0 700 280" aria-label="Growth ratio chart"></svg>
+    </main>
+  </div>
+
+  <footer class="panel" role="contentinfo">
+    <h2>Plünnecke (graph) viewpoint — one‑paragraph brief</h2>
+    <p>
+      Plünnecke’s inequalities control additive growth of a set A in an abelian group via directed layered graphs: if adding A expands a set by at most a factor M on average, then k steps of addition and ℓ steps of subtraction are bounded by powers of M. In ℤ/pℤ this suggests that the magnification ratios |kA − ℓA| / |A| cannot explode arbitrarily fast. This toy lets you fix one of k or ℓ and graph the function t ↦ |kA − tA| / |A| (or |tA − ℓA| / |A|) for your chosen set A.
+    </p>
+    <p class="notice">Controls: Click inner‑ring points to toggle membership in A. Choose a prime p, decide whether to sweep k or ℓ, set a fixed value and a max for the free variable, then press <span class="kbd">Plot</span>. Drag the slider to highlight a specific t and read off the current ratio.</p>
+  </footer>
+
+  <script>
+    // ---------- Math helpers ----------
+    function isPrime(n){ if(n<2) return false; if(n%2===0) return n===2; for(let d=3; d*d<=n; d+=2){ if(n%d===0) return false; } return true; }
+    function sizeOf(mask){ let c=0; for(const v of mask) if(v) c++; return c; }
+
+    function sumset(A,B,p){
+      const S = new Array(p).fill(false);
+      for(let i=0;i<p;i++) if(A[i]){
+        for(let j=0;j<p;j++) if(B[j]){
+          S[(i+j)%p]=true;
+        }
+      }
+      return S;
+    }
+    function diffset(X,Y,p){
+      const D = new Array(p).fill(false);
+      for(let i=0;i<p;i++) if(X[i]){
+        for(let j=0;j<p;j++) if(Y[j]){
+          D[(i-j+p)%p]=true;
+        }
+      }
+      return D;
+    }
+    function kFoldSum(A,k,p){
+      // 0A = {0}
+      if(k===0){ const Z=new Array(p).fill(false); Z[0]=true; return Z; }
+      let cur = A.slice(); // 1A = A
+      for(let t=2;t<=k;t++) cur = sumset(cur,A,p);
+      return cur;
+    }
+
+    // ---------- State ----------
+    let p = 29;
+    let A = new Array(p).fill(false);
+
+    // ---------- Ring UI ----------
+    const ring = document.getElementById('ring');
+    const cx = 350, cy = 210, rOuter = 170, rA = 130;
+
+    function renderRing(){
+      ring.innerHTML='';
+      // outer circle
+      const circ = (r, stroke, w) => { const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('cx',cx); c.setAttribute('cy',cy); c.setAttribute('r',r); c.setAttribute('fill','none'); c.setAttribute('stroke',stroke); c.setAttribute('stroke-width',w); return c; };
+      ring.appendChild(circ(rOuter,'#243157',3));
+      ring.appendChild(circ(rA,'#2a3568',2));
+
+      // tick marks
+      for(let i=0;i<p;i++){
+        const ang = -Math.PI/2 + 2*Math.PI*i/p;
+        const x1 = cx + (rOuter-10)*Math.cos(ang), y1 = cy + (rOuter-10)*Math.sin(ang);
+        const x2 = cx + (rOuter-22)*Math.cos(ang), y2 = cy + (rOuter-22)*Math.sin(ang);
+        const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+        tick.setAttribute('x1',x1); tick.setAttribute('y1',y1); tick.setAttribute('x2',x2); tick.setAttribute('y2',y2);
+        tick.setAttribute('stroke','#33467a'); tick.setAttribute('stroke-width','2');
+        ring.appendChild(tick);
+      }
+
+      // A nodes (circles)
+      for(let i=0;i<p;i++){
+        const ang = -Math.PI/2 + 2*Math.PI*i/p;
+        const xa = cx + rA*Math.cos(ang), ya = cy + rA*Math.sin(ang);
+        const nodeA = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        nodeA.setAttribute('cx',xa); nodeA.setAttribute('cy',ya); nodeA.setAttribute('r',10);
+        nodeA.setAttribute('fill', A[i] ? '#5cc7ff' : '#22305f');
+        nodeA.setAttribute('stroke', '#6cf'); nodeA.setAttribute('stroke-width','2');
+        nodeA.style.cursor='pointer';
+        nodeA.addEventListener('click',()=>{ A[i]=!A[i]; updateStats(); });
+        ring.appendChild(nodeA);
+
+        if(p<=29 || i%5===0){
+          const rl = rA-28; const xl = cx + rl*Math.cos(ang), yl = cy + rl*Math.sin(ang);
+          const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+          label.setAttribute('x',xl); label.setAttribute('y',yl); label.setAttribute('fill','#9aa4c7');
+          label.setAttribute('font-size','11'); label.setAttribute('text-anchor','middle'); label.setAttribute('dominant-baseline','middle');
+          label.textContent = i.toString(); ring.appendChild(label);
+        }
+      }
+
+      // title
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',cx); t.setAttribute('y',cy);
+      t.setAttribute('fill','#9aa4c7'); t.setAttribute('font-size','16'); t.setAttribute('text-anchor','middle');
+      t.textContent = `Z / ${p}Z`;
+      ring.appendChild(t);
+    }
+
+    // ---------- Chart ----------
+    const chart = document.getElementById('chart');
+    const padL=52, padR=18, padT=16, padB=34, W=700, H=280;
+
+    function computeSeries(){
+      const mode = document.getElementById('mode').value; // sweepL or sweepK
+      const fixed = Math.max(0, parseInt(document.getElementById('fixed').value,10)||0);
+      const maxFree = Math.max(0, parseInt(document.getElementById('maxFree').value,10)||0);
+      const n = Math.max(1, maxFree+1);
+      const series = [];
+      const sizeAVal = sizeOf(A);
+      if(sizeAVal===0){ return {series:[], xlab:mode==='sweepL'?'ℓ':'k', fixedLabel: mode==='sweepL'?`k=${fixed}`:`ℓ=${fixed}`, rangeLabel: mode==='sweepL'?`ℓ = 0…${maxFree}`:`k = 0…${maxFree}`}; }
+
+      if(mode==='sweepL'){
+        // fix k, sweep l = 0..maxFree
+        const kfix = fixed;
+        const kA = kFoldSum(A,kfix,p);
+        for(let l=0;l<=maxFree;l++){
+          const lA = kFoldSum(A,l,p);
+          const D = diffset(kA,lA,p);
+          series.push({t:l, val: sizeOf(D)/sizeAVal});
+        }
+      } else {
+        // fix l, sweep k
+        const lfix = fixed;
+        const lA = kFoldSum(A,lfix,p);
+        for(let k=0;k<=maxFree;k++){
+          const kA = kFoldSum(A,k,p);
+          const D = diffset(kA,lA,p);
+          series.push({t:k, val: sizeOf(D)/sizeAVal});
+        }
+      }
+      return {series, xlab: (document.getElementById('mode').value==='sweepL'?'ℓ':'k'), fixedLabel: (document.getElementById('mode').value==='sweepL'?`k=${fixed}`:`ℓ=${fixed}`), rangeLabel: (document.getElementById('mode').value==='sweepL'?`ℓ = 0…${maxFree}`:`k = 0…${maxFree}`)};
+    }
+
+    function renderChart(){
+      chart.innerHTML='';
+      const {series, xlab, fixedLabel, rangeLabel} = computeSeries();
+      document.getElementById('fixedLabel').textContent = fixedLabel;
+      document.getElementById('rangeLabel').textContent = rangeLabel;
+
+      // axes
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      chart.appendChild(g);
+      const xmin=0, xmax=(series.length? series[series.length-1].t : 1);
+      let ymin=0, ymax=1;
+      for(const pnt of series){ if(pnt.val>ymax) ymax=pnt.val; }
+      ymax = Math.max(ymax, 1);
+
+      const xTo = t => padL + (t - xmin) / (xmax - xmin || 1) * (W - padL - padR);
+      const yTo = v => H - padB - (v - ymin) / (ymax - ymin || 1) * (H - padT - padB);
+
+      // grid
+      const axis = (x1,y1,x2,y2,stroke='#2a3568',w=1)=>{ const ln=document.createElementNS('http://www.w3.org/2000/svg','line'); ln.setAttribute('x1',x1); ln.setAttribute('y1',y1); ln.setAttribute('x2',x2); ln.setAttribute('y2',y2); ln.setAttribute('stroke',stroke); ln.setAttribute('stroke-width',w); chart.appendChild(ln); };
+      axis(padL, yTo(0), W-padR, yTo(0)); // x-axis
+      axis(padL, padT, padL, H-padB); // y-axis
+
+      for(let y=0; y<=Math.floor(ymax); y++){
+        const yy=yTo(y); axis(padL, yy, W-padR, yy, '#233057', 1);
+        const tx = document.createElementNS('http://www.w3.org/2000/svg','text'); tx.setAttribute('x', padL-8); tx.setAttribute('y', yy); tx.setAttribute('fill','#9aa4c7'); tx.setAttribute('font-size','11'); tx.setAttribute('text-anchor','end'); tx.setAttribute('dominant-baseline','middle'); tx.textContent=y; chart.appendChild(tx);
+      }
+      for(const pnt of series){ const tx=document.createElementNS('http://www.w3.org/2000/svg','text'); tx.setAttribute('x', xTo(pnt.t)); tx.setAttribute('y', H-padB+14); tx.setAttribute('fill','#9aa4c7'); tx.setAttribute('font-size','11'); tx.setAttribute('text-anchor','middle'); tx.textContent=pnt.t; chart.appendChild(tx); }
+
+      // labels
+      const xlabel = document.createElementNS('http://www.w3.org/2000/svg','text'); xlabel.setAttribute('x',(padL+W-padR)/2); xlabel.setAttribute('y', H-6); xlabel.setAttribute('fill','#9aa4c7'); xlabel.setAttribute('font-size','12'); xlabel.setAttribute('text-anchor','middle'); xlabel.textContent = xlab; chart.appendChild(xlabel);
+      const ylabel = document.createElementNS('http://www.w3.org/2000/svg','text'); ylabel.setAttribute('x',16); ylabel.setAttribute('y',20); ylabel.setAttribute('fill','#9aa4c7'); ylabel.setAttribute('font-size','12'); ylabel.textContent = '|kA − ℓA| / |A|'; chart.appendChild(ylabel);
+
+      // polyline
+      if(series.length){
+        const path = series.map(pnt=>`${xTo(pnt.t)},${yTo(pnt.val)}`).join(' ');
+        const pl = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        pl.setAttribute('points', path); pl.setAttribute('fill','none'); pl.setAttribute('stroke','#6ee7b7'); pl.setAttribute('stroke-width','2.5'); chart.appendChild(pl);
+
+        // points
+        series.forEach(pnt=>{
+          const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          c.setAttribute('cx', xTo(pnt.t)); c.setAttribute('cy', yTo(pnt.val)); c.setAttribute('r',4.5); c.setAttribute('fill','#6cf'); c.style.cursor='pointer';
+          c.addEventListener('mouseenter',()=>{
+            showTooltip(xTo(pnt.t), yTo(pnt.val)-10, `${pnt.val.toFixed(3)}`);
+            document.getElementById('ratioNow').textContent = pnt.val.toFixed(3);
+          });
+          c.addEventListener('mouseleave',()=>{ hideTooltip(); });
+          chart.appendChild(c);
+        });
+      }
+    }
+
+    // tooltip
+    let tip;
+    function showTooltip(x,y,text){
+      hideTooltip();
+      tip = document.createElementNS('http://www.w3.org/2000/svg','g');
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', x-24); rect.setAttribute('y', y-22); rect.setAttribute('width', 48); rect.setAttribute('height', 18);
+      rect.setAttribute('rx',6); rect.setAttribute('fill','#1f254a'); rect.setAttribute('stroke','#2a3568');
+      const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+      tx.setAttribute('x', x); tx.setAttribute('y', y-9); tx.setAttribute('fill','#e8ecff'); tx.setAttribute('font-size','11'); tx.setAttribute('text-anchor','middle'); tx.textContent=text;
+      tip.appendChild(rect); tip.appendChild(tx); chart.appendChild(tip);
+    }
+    function hideTooltip(){ if(tip){ tip.remove(); tip=null; } }
+
+    // ---------- Stats and bindings ----------
+    function updateStats(){
+      document.getElementById('sizeA').textContent = sizeOf(A);
+      renderRing();
+      renderChart();
+    }
+
+    document.getElementById('applyP').addEventListener('click',()=>{
+      const val = parseInt(document.getElementById('p').value,10);
+      if(!isPrime(val)) { alert('Please enter a prime p (≥ 5).'); return; }
+      p = val; A = new Array(p).fill(false); updateStats();
+      // adjust slider range if needed
+      const maxFree = parseInt(document.getElementById('maxFree').value,10)||0; document.getElementById('tSlider').max = maxFree;
+    });
+    document.getElementById('randomize').addEventListener('click',()=>{
+      const d = 0.2 + Math.random()*0.25; A = new Array(p).fill(false); for(let i=0;i<p;i++) if(Math.random()<d) A[i]=true; if(sizeOf(A)===0) A[Math.floor(Math.random()*p)]=true; updateStats();
+    });
+    document.getElementById('reset').addEventListener('click',()=>{ A = new Array(p).fill(false); updateStats(); });
+    document.getElementById('makeAInterval').addEventListener('click',()=>{
+      const k = Math.max(1, Math.min(p, Math.floor(p/4))); // choose a default size if A was empty
+      const newA = new Array(p).fill(false); for(let t=0;t<k;t++) newA[t]=true; A = newA; updateStats();
+    });
+    document.getElementById('replot').addEventListener('click',()=>{ renderChart(); });
+    document.getElementById('mode').addEventListener('change',()=>{ renderChart(); updateLabels(); });
+    document.getElementById('fixed').addEventListener('input',()=>{ renderChart(); updateLabels(); });
+    document.getElementById('maxFree').addEventListener('input',()=>{ renderChart(); updateLabels(); document.getElementById('tSlider').max = document.getElementById('maxFree').value; });
+
+    function updateLabels(){
+      const mode = document.getElementById('mode').value; const fixed = parseInt(document.getElementById('fixed').value,10)||0; const maxFree = parseInt(document.getElementById('maxFree').value,10)||0;
+      document.getElementById('fixedLabel').textContent = mode==='sweepL' ? `k=${fixed}` : `ℓ=${fixed}`;
+      document.getElementById('rangeLabel').textContent = mode==='sweepL' ? `ℓ = 0…${maxFree}` : `k = 0…${maxFree}`;
+      document.getElementById('tSlider').max = maxFree;
+    }
+
+    // slider highlight
+    document.getElementById('tSlider').addEventListener('input', (e)=>{
+      const t = parseInt(e.target.value,10)||0; document.getElementById('tval').textContent = t;
+      // compute the ratio at this t
+      const mode = document.getElementById('mode').value; const fixed = Math.max(0, parseInt(document.getElementById('fixed').value,10)||0);
+      const sizeAVal = sizeOf(A); if(sizeAVal===0){ document.getElementById('ratioNow').textContent='—'; return; }
+      if(mode==='sweepL'){
+        const kA = kFoldSum(A,fixed,p); const lA = kFoldSum(A,t,p); const D = diffset(kA,lA,p); document.getElementById('ratioNow').textContent = (sizeOf(D)/sizeAVal).toFixed(3);
+      } else {
+        const kA = kFoldSum(A,t,p); const lA = kFoldSum(A,fixed,p); const D = diffset(kA,lA,p); document.getElementById('ratioNow').textContent = (sizeOf(D)/sizeAVal).toFixed(3);
+      }
+    });
+
+    // init
+    A[0]=true; A[1]=true; A[2]=true; updateStats(); updateLabels();
+  </script>
+</body>
+</html>
